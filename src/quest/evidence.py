@@ -31,6 +31,8 @@ class EvidenceGraph:
         self.outgoing: dict[str, list[str]] = defaultdict(list)
         self.incoming: dict[str, list[str]] = defaultdict(list)
         self.entity_facts: dict[str, set[str]] = defaultdict(set)
+        self.relation_facts: dict[str, set[str]] = defaultdict(set)
+        self.passage_facts: dict[str, set[str]] = defaultdict(set)
         self.alias_to_entity: dict[str, str] = {}
         self.relation_cardinality: Counter[str] = Counter()
         self.degree: Counter[str] = Counter()
@@ -43,6 +45,8 @@ class EvidenceGraph:
         self.outgoing.clear()
         self.incoming.clear()
         self.entity_facts.clear()
+        self.relation_facts.clear()
+        self.passage_facts.clear()
         self.alias_to_entity.clear()
         self.relation_cardinality.clear()
         self.degree.clear()
@@ -58,7 +62,10 @@ class EvidenceGraph:
             self.incoming[object_].append(fact.id)
             self.entity_facts[subject].add(fact.id)
             self.entity_facts[object_].add(fact.id)
-            self.relation_cardinality[normalize_text(fact.relation)] += 1
+            relation = normalize_text(fact.relation)
+            self.relation_facts[relation].add(fact.id)
+            self.passage_facts[fact.passage_id].add(fact.id)
+            self.relation_cardinality[relation] += 1
             self.degree[subject] += 1
             self.degree[object_] += 1
             self._fact_text[fact.id] = (
@@ -214,6 +221,52 @@ class CorpusBuilder:
                 },
             ]
         )
+        return self._facts_from_response(passage, response)
+
+    def extract_for_constraint(
+        self,
+        passage: Passage,
+        *,
+        source: str,
+        relation: str,
+        target: str,
+        retrieval_query: str,
+        bindings: dict[str, str],
+    ) -> list[EvidenceFact]:
+        response = self.client.complete_json(
+            [
+                {
+                    "role": "system",
+                    "content": (
+                        "Extract only facts from the supplied passage that can support the specified "
+                        "directed constraint. Return an object with a facts array. Each fact has "
+                        "subject, relation, object, and one exact supporting sentence. Respect the "
+                        "given endpoint bindings and relation direction. Do not emit unsupported facts."
+                    ),
+                },
+                {
+                    "role": "user",
+                    "content": json.dumps(
+                        {
+                            "constraint": {
+                                "source": source,
+                                "relation": relation,
+                                "target": target,
+                            },
+                            "bindings": bindings,
+                            "retrieval_query": retrieval_query,
+                            "passage": {"title": passage.title, "text": passage.text},
+                        },
+                        ensure_ascii=False,
+                    ),
+                },
+            ]
+        )
+        return self._facts_from_response(passage, response)
+
+    def _facts_from_response(
+        self, passage: Passage, response: dict[str, Any]
+    ) -> list[EvidenceFact]:
         sentences = [row.strip() for row in _SENTENCE.split(passage.text) if row.strip()]
         facts: list[EvidenceFact] = []
         for row in response.get("facts", []):

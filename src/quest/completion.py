@@ -153,7 +153,7 @@ class EvidenceCompletion:
             for request in requests:
                 edge = query.edge_map[request.edge_id]
                 new_facts = self._retrieve_and_verify(
-                    edge, request, dict(request.bindings)
+                    query, edge, request, dict(request.bindings)
                 )
                 if not new_facts:
                     continue
@@ -203,6 +203,7 @@ class EvidenceCompletion:
 
     def _retrieve_and_verify(
         self,
+        query: QueryGraph,
         edge: QueryEdge,
         request: RetrievalRequest,
         bindings: dict[str, str],
@@ -213,7 +214,14 @@ class EvidenceCompletion:
         candidates = []
         seen = set(self.graph.facts)
         for passage, _ in passages:
-            for fact in self.builder.extract(passage):
+            for fact in self.builder.extract_for_constraint(
+                passage,
+                source=query.node_map[edge.source].label,
+                relation=edge.relation,
+                target=query.node_map[edge.target].label,
+                retrieval_query=request.query,
+                bindings=bindings,
+            ):
                 if fact.id in seen:
                     continue
                 annotated = self.ontology.annotate_fact(fact)

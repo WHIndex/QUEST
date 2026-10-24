@@ -51,7 +51,7 @@ class CertificateChecker:
         provenance = self._provenance_holds(query, state)
         reasons = []
         if not coverage:
-            reasons.append("incomplete_constraint_coverage")
+            reasons.append("constraint_coverage_failed")
         if not binding:
             reasons.append("inconsistent_variable_binding")
         if not projection:
