@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "quest-graph"
+version = "0.1.0"
+description = "Structured evidence retrieval for question answering"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "requests>=2.31,<3",
+]
+
+[project.scripts]
+quest = "quest.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
